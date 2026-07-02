@@ -159,13 +159,20 @@ class Ship {
     this.y = wrap(this.y + this.vy * dt, H);
   }
 
-  tryShoot() {
+  tryShoot(triple = false) {
     if (this.shootCooldown > 0 || this.dead) return [];
     this.shootCooldown = 0.2;
     const NOSE = 21;
     const ox = this.x + Math.cos(this.angle) * NOSE;
     const oy = this.y + Math.sin(this.angle) * NOSE;
-    return [new Bullet(ox, oy, this.angle)];
+    if (!triple) return [new Bullet(ox, oy, this.angle)];
+
+    const SPREAD = 0.22; // rad, ~13°
+    return [
+      new Bullet(ox, oy, this.angle - SPREAD),
+      new Bullet(ox, oy, this.angle),
+      new Bullet(ox, oy, this.angle + SPREAD),
+    ];
   }
 
   draw() {
@@ -240,6 +247,8 @@ let ship, bullets, asteroids, particles;
 let score, lives, level;
 let state;      // 'playing' | 'dead' | 'gameover'
 let deadTimer;
+let tripleShotTimer; // segundos restantes de disparo triple (0 = inactivo)
+let powerUpUsed;     // si el power-up de disparo triple ya se activó esta partida
 
 function spawnAsteroids(count) {
   const SAFE_DIST = 130;
@@ -262,6 +271,8 @@ function initGame() {
   lives  = 3;
   level  = 1;
   state  = 'playing';
+  tripleShotTimer = 0;
+  powerUpUsed     = false;
   spawnAsteroids(4);
 }
 
@@ -309,8 +320,10 @@ function update(dt) {
 
   // Disparar
   if (pressed('Space')) {
-    bullets.push(...ship.tryShoot());
+    bullets.push(...ship.tryShoot(tripleShotTimer > 0));
   }
+
+  if (tripleShotTimer > 0) tripleShotTimer -= dt;
 
   ship.update(dt);
   bullets.forEach(b => b.update(dt));
@@ -330,6 +343,10 @@ function update(dt) {
         score += POINTS[a.size];
         explode(a.x, a.y, a.size * 5);
         newAsteroids.push(...a.split());
+        if (!powerUpUsed && Math.random() < 0.25) {
+          powerUpUsed = true;
+          tripleShotTimer = 10;
+        }
       }
     }
   }
